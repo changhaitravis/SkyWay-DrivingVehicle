@@ -1,0 +1,65 @@
+name: iOS DrivingVehicle Build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    name: Build DrivingVehicle .ipa
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install CocoaPods
+        run: |
+          sudo gem install cocoapods
+
+      - name: Install Pods
+        run: |
+          cd DrivingVehicle # Navigate to the DrivingVehicle folder
+          pod install
+          cd .. # Navigate back to the root
+
+      - name: Clone DoubleControlSDK Repository
+        run: |
+          git clone https://github.com/doublerobotics/Basic-Control-SDK-iOS.git
+
+      - name: Download and Copy Frameworks
+        run: |
+          mkdir -p DrivingVehicle/DrivingVehicle/frameworks # Adjusted path
+          curl -L "https://github.com/skyway/skyway-ios-sdk/releases/download/v2.0.1/SkyWay_iOS_2.0.1.zip" -o SkyWay_iOS_2.0.1.zip
+          unzip SkyWay_iOS_2.0.1.zip -d DrivingVehicle/DrivingVehicle/frameworks/
+          mv DrivingVehicle/DrivingVehicle/frameworks/SkyWay_iOS_2.0.1/SkyWay.framework DrivingVehicle/DrivingVehicle/frameworks/
+          rm -rf SkyWay_iOS_2.0.1.zip DrivingVehicle/DrivingVehicle/frameworks/SkyWay_iOS_2.0.1
+          cp -r Basic-Control-SDK-iOS/DoubleControlSDK.framework DrivingVehicle/DrivingVehicle/frameworks/ # Adjusted path
+
+      - name: Set API Keys
+        run: |
+          sed -i '' "s/let kAPIkey:String = \"yourAPIkey\"/let kAPIkey:String = \"<span class="math-inline">\{\{ secrets\.SKYWAY\_API\_KEY \}\}\\"/g" DrivingVehicle/DrivingVehicle/models/peer/SkyWay\.swift \# Adjusted path
+sed \-i '' "s/let kDomain\:String \= \\"yourDomain\\"/let kDomain\:String \= \\"</span>{{ secrets.SKYWAY_DOMAIN }}\"/g" DrivingVehicle/DrivingVehicle/models/peer/SkyWay.swift # Adjusted path
+
+      - name: Build .ipa (Romo)
+        run: |
+          xcodebuild clean archive -workspace DrivingVehicle/DrivingVehicle.xcworkspace -scheme Romo -configuration Release -archivePath DrivingVehicleRomo.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="<span class="math-inline">\{\{ secrets\.CODE\_SIGN\_IDENTITY \}\}" PROVISIONING\_PROFILE\="</span>{{ secrets.PROVISIONING_PROFILE }}"
+          xcodebuild -exportArchive -archivePath DrivingVehicleRomo.xcarchive -exportPath DrivingVehicleRomo -exportOptionsPlist DrivingVehicle/ExportOptions.plist # adjusted path.
+
+      - name: Build .ipa (Double)
+        run: |
+          xcodebuild clean archive -workspace DrivingVehicle/DrivingVehicle.xcworkspace -scheme Double -configuration Release -archivePath DrivingVehicleDouble.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="<span class="math-inline">\{\{ secrets\.CODE\_SIGN\_IDENTITY \}\}" PROVISIONING\_PROFILE\="</span>{{ secrets.PROVISIONING_PROFILE }}"
+          xcodebuild -exportArchive -archivePath DrivingVehicleDouble.xcarchive -exportPath DrivingVehicleDouble -exportOptionsPlist DrivingVehicle/ExportOptions.plist #adjusted path.
+
+      - name: Upload Romo .ipa Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Romo.ipa
+          path: DrivingVehicleRomo/*.ipa
+
+      - name: Upload Double .ipa Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name
